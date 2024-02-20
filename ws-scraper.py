@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 from datetime import datetime
+import time
 import paho.mqtt.client as mqtt
 
 MQTT_SERVER = "bigblackbox.local"
@@ -20,10 +21,17 @@ mqttc = mqtt.Client("weatherpi")
 mqttc.connect(MQTT_SERVER, MQTT_PORT)
 print(f"MQTT connected to {MQTT_SERVER}:{MQTT_PORT}")
 
+def on_publish(client, userdata, message):
+    pass
+    # print(f"Published: {message}")
+
+mqttc.on_publish = on_publish
+
 process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
 def send_over_mqtt(message):
     global mqttc
+    print(message)
 
     model = message.get('model')
     id = message.get('id')
@@ -31,7 +39,6 @@ def send_over_mqtt(message):
 
     payload = str(message)
 
-    # print(f"Sending over MQTT: {message}")
     mqttc.publish(MQTT_TOPIC + subtopic + "/json", payload)
 
     for key, value in message.items():
@@ -92,6 +99,8 @@ def dump_all_sensors(clear=False):
         print(f"{time} [{interval}, {count}] | {id} {model} CH{channel} | {copied_dict}")
     print(80 * "-")
 
+mqttc.loop_start()
+
 while True:
     output = process.stdout.readline()  # Read a line from the output
     if output == '' and process.poll() is not None:  # If no more output and the process has terminated
@@ -101,6 +110,7 @@ while True:
         # update_sensors(jstring)
         send_over_mqtt(jstring)
 
+mqttc.loop_stop()
 
 return_code = process.wait()
 print("Process finished with return code:", return_code)
